@@ -28,7 +28,6 @@ impl<T: Debug + Clone + Copy + One + Zero + Add<T, Output = T>> Matrix<T> {
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
             matrix_internal_op_mut(&mut x, &y, |x,&y| {
-            
                 *x = *x + y
             });
         });
@@ -39,20 +38,12 @@ impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
     pub fn substract_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
             matrix_internal_op_mut(&mut x, &y, |x,&y| {
-            
                 *x = *x - y
             });
         });
     }
 }
 
-/*
-/// Adding and consuming two matrices
-impl<T: Copy + One + Zero + Add<T, Output = T>> Add<Matrix<T>> for Matrix<T> {
-    type Output = Matrix<T>;
-
-    fn add(self, f: Matrix<T>) -> Matrix<T> { ... }
-*/
 
 
 #[cfg(test)]
