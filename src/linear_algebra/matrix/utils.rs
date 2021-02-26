@@ -1,5 +1,4 @@
 use std::cmp::min;
-use crate::linear_algebra::Matrix;
 
 pub(crate) fn matrix_internal_op_mut<F, T: Clone>(u: &mut [T], v: &[T], mut f: F)
 where F: FnMut(&mut T, &T) 
