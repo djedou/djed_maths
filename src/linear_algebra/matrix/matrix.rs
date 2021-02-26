@@ -1,8 +1,9 @@
 use std::ops::{Add, Sub};
 use super::matrix_internal_op_mut;
-use num::{One, Zero};
+use num::{One, Zero, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::Vector;
+use std::cmp::PartialEq;
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -11,7 +12,7 @@ pub struct Matrix<T> {
     data: Vec<Vec<T>>,
 }
 
-impl<T: Debug + Clone> Matrix<T> {
+impl<T: Debug + Clone + Default> Matrix<T> {
     /// new Matrix from Vec
     pub fn new_from_vec(cols: usize, value: Vec<T>) -> Matrix<T> {
         let data_slices: Vec<&[T]> = value.chunks(cols).collect();
@@ -24,7 +25,21 @@ impl<T: Debug + Clone> Matrix<T> {
         }
     }
 
-    /// print Matrix in console
+    /// new Matrix fill with zeros or default T type
+    pub fn new_with_zeros(rows: usize, cols: usize) -> Matrix<T> {
+        let zeros = vec![T::default(); cols];
+
+        let mut data: Vec<Vec<T>> = Vec::new();
+        (0..rows).into_iter().for_each(|_| data.push(zeros.clone()));
+
+        Matrix {
+            rows,
+            cols,
+            data
+        }
+    }
+
+    /// print Matrix into console
     pub fn view(&self) {
         println!("rows: {}", self.rows);
         println!("cols: {}", self.cols);
@@ -40,7 +55,7 @@ impl<T: Debug + Clone> Matrix<T> {
         self.data.clone()
     }
 
-    /// cast a Matrix into Vector
+    /// cast a Matrix into Vector (row vector)
     pub fn into_vector(&self) -> Vector<T> {
 
         let mut vector: Vec<T> = Vec::new();
@@ -52,13 +67,15 @@ impl<T: Debug + Clone> Matrix<T> {
 
     }
 
-    /// check if the matrix is a square matrix n x m where n == m.
-    pub fn is_square_matrix(&self) -> bool {
+    /// Check if the matrix is a square matrix n x m where n == m.
+    pub fn is_square(&self) -> bool {
         self.rows == self.cols
     }
+
+    
 }
 
-impl<T: Debug + Clone + Copy + One + Zero + Add<T, Output = T>> Matrix<T> {
+impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T>> Matrix<T> {
     /// add two matrix, the result is in the first matrix
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
@@ -67,9 +84,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Add<T, Output = T>> Matrix<T> {
             });
         });
     }
-}
 
-impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
     /// subtruct two matrix, the result is in the first matrix
     pub fn sub_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
@@ -78,6 +93,93 @@ impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
             });
         });
     }
+
+    /// Transpose a Matrix
+    pub fn transpose(&self) -> Matrix<T> {
+        let mut transpose_matrix: Matrix<T> = Matrix::new_with_zeros(self.cols,self.rows);
+
+        for a in (0..self.rows).into_iter() {
+            for b in (0..self.cols).into_iter() {
+                transpose_matrix.data[b][a] = self.data[a][b];
+            }
+        }
+
+        transpose_matrix
+    }
+
+    /// Compare two matrix, if they are equal
+    pub fn is_equal_to(&self, rhs: &Matrix<T>) -> bool {
+        if self.rows == rhs.rows && self.cols == rhs.cols {
+            let self_vector = self.into_vector();
+            let rhs_vector = rhs.into_vector();
+            for (a, b) in self_vector.get_data().iter().zip(rhs_vector.get_data().iter()) {
+                if *a != *b {
+                    return false;
+                }
+            }
+            true
+        }
+        else {
+            false
+        }
+    }
+
+    /// Check if a Matrix is symmetric
+    pub fn is_symmetric(&self) -> bool {
+        if self.is_square() {
+            let transpose = self.transpose();
+            self.is_equal_to(&transpose)
+        }
+        else {
+            false
+        }
+    }
+
+    /// multiply by a scalar
+    pub fn mul_by_scalar(&self, scalar: T) -> Matrix<T> {
+        let vector = self.into_vector();
+        let vector = vector.mul_by_scalar(scalar);
+
+        vector.into_matrix(self.cols)
+    }
+
+    /// Get column by index
+    pub fn get_col(&self, n: usize) -> Vector<T> {
+        let mut data: Vec<T> = Vec::new();
+        for a in self.data.iter() {
+            data.push(a[n]);
+        };
+
+        Vector::new_from_vec(data)
+    }
+
+    /// Get row by index
+    pub fn get_row(&self, n: usize) -> Vector<T> {
+        let data = &self.data[n];
+
+        Vector::new_from_vec(data.clone())
+    }
+
+    
+    /// multiply by a matrix
+    pub fn product_by_matrix(&self, rhs: &Matrix<T>) -> Option<Matrix<T>> {
+        if self.cols == rhs.rows {
+            let mut data: Vec<T> = Vec::new();
+            for a in (0..self.rows).into_iter() {
+                let row = self.get_row(a);
+                for b in (0..rhs.cols).into_iter() {
+                    let col = rhs.get_col(b);
+                    let sum = row.get_data().iter().zip(col.get_data().iter()).fold(T::default(), |acc,(a,b)| acc + ((*a) * (*b)));
+                    data.push(sum);
+                }
+            }
+            Some(Matrix::new_from_vec(rhs.cols, data))
+        }
+        else {
+            None
+        }
+    }
+
 }
 
 
@@ -118,4 +220,82 @@ mod matrix_tests {
         vector.view();
         assert_eq!(2 + 2, 4);
     }
+    
+
+    #[test]
+    fn new_with_zeros() {
+        let a = Matrix::<i32>::new_with_zeros(4,4);
+        a.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn transpose() {
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        mat.view();
+        let transpose = mat.transpose();
+        transpose.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn is_equal_to() {
+        let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        mat.view();
+        let transpose = mat.transpose();
+        let equl = mat.is_equal_to(&transpose);
+        println!("they are equals: {:?}", equl);
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn is_symmetric() {
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let sym = mat.is_symmetric();
+        println!("is_symetric: {:?}", sym);
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn mul_by_scalar() {
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        mat.view();
+        let mul_by_scalar = mat.mul_by_scalar(2);
+        mul_by_scalar.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn get_col() {
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        mat.view();
+        let get_col = mat.get_col(0);
+        get_col.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn get_row() {
+        //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        mat.view();
+        let get_col = mat.get_row(1);
+        get_col.view();
+        assert_eq!(2 + 2, 4);
+    }
+    #[test]
+    fn product_by_matrix() {
+        let mat1 = Matrix::<i32>::new_from_vec(3,vec![1,3,-2,0,-1,4]);
+        let mat2 = Matrix::<i32>::new_from_vec(2,vec![2,-2,1,5,-3,4]);
+        if let Some(mut_mat) = mat1.product_by_matrix(&mat2) {
+            mut_mat.view();
+        }
+        assert_eq!(2 + 2, 4);
+    }
+    
 }

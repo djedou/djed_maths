@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use crate::linear_algebra::Matrix;
 
 
+/// A Vector here is seen as a row matrix or row vector, so size of 1 x n.
 #[derive(Debug, Clone)]
 pub struct Vector<T> {
     rows: usize,
@@ -11,7 +12,7 @@ pub struct Vector<T> {
     data: Vec<T>,
 }
 
-impl<T: Debug + Clone> Vector<T> {
+impl<T: Debug + Clone + Default> Vector<T> {
     /// new Vector from Vec
     pub fn new_from_vec(value: Vec<T>) -> Vector<T> {
 
