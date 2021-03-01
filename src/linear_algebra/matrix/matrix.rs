@@ -2,7 +2,7 @@ use std::ops::{Add, Sub};
 use super::matrix_internal_op_mut;
 use num::{One, Zero, NumCast};
 use std::fmt::Debug;
-use crate::linear_algebra::Vector;
+use crate::linear_algebra::vector::Vector;
 use std::cmp::PartialEq;
 
 #[derive(Debug, Clone)]
@@ -14,7 +14,7 @@ pub struct Matrix<T> {
 
 impl<T: Debug + Clone + Default> Matrix<T> {
     /// new Matrix from Vec
-    pub fn new_from_vec(cols: usize, value: Vec<T>) -> Matrix<T> {
+    pub fn new_from_vec(cols: usize, value: &Vec<T>) -> Matrix<T> {
         let data_slices: Vec<&[T]> = value.chunks(cols).collect();
         let data: Vec<Vec<T>> = data_slices.into_iter().map(|d| d.to_vec()).collect();
 
@@ -63,7 +63,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
             vector.extend_from_slice(v.as_slice())
         });
         
-        Vector::new_from_vec(vector)
+        Vector::new_from_vec(&vector)
 
     }
 
@@ -150,35 +150,51 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
             data.push(a[n]);
         };
 
-        Vector::new_from_vec(data)
+        Vector::new_from_vec(&data)
     }
 
     /// Get row by index
     pub fn get_row(&self, n: usize) -> Vector<T> {
         let data = &self.data[n];
 
-        Vector::new_from_vec(data.clone())
+        Vector::new_from_vec(&data)
     }
 
+    /// add a new column to the matrix, only possible when self.rows == col.len()
+    pub fn add_col(&mut self, col: &Vec<T>) {
+        if self.rows == col.len() {
+            for k in (0..col.len()).into_iter() {
+                self.data[k].push(col[k]);
+            }
+        }
+    }
+
+    pub fn add_row(&mut self, row: &Vec<T>){
+        if self.cols == row.len() {
+            self.data.push(row.to_vec());
+        }
+    }
     
-    /// multiply by a matrix
-    pub fn product_by_matrix(&self, rhs: &Matrix<T>) -> Option<Matrix<T>> {
+    /// dot product two matrix
+    pub fn dot_product(&self, rhs: &Matrix<T>) -> Option<Matrix<T>> {
         if self.cols == rhs.rows {
             let mut data: Vec<T> = Vec::new();
             for a in (0..self.rows).into_iter() {
                 let row = self.get_row(a);
                 for b in (0..rhs.cols).into_iter() {
                     let col = rhs.get_col(b);
-                    let sum = row.get_data().iter().zip(col.get_data().iter()).fold(T::default(), |acc,(a,b)| acc + ((*a) * (*b)));
+                    let sum = row.dot_product(&col);
                     data.push(sum);
                 }
             }
-            Some(Matrix::new_from_vec(rhs.cols, data))
+            Some(Matrix::new_from_vec(rhs.cols, &data))
         }
         else {
             None
         }
     }
+
+
 
 }
 
@@ -189,15 +205,15 @@ mod matrix_tests {
     use super::Matrix;
     #[test]
     fn new() {
-        let a = Matrix::<i32>::new_from_vec(2,vec![2,-1,-7,4]);
+        let a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
         println!("{:?}", a);
         assert_eq!(2 + 2, 4);
     }
 
     #[test]
     fn add() {
-        let mut a = Matrix::<i32>::new_from_vec(2,vec![2,-1,-7,4]);
-        let b = Matrix::<i32>::new_from_vec(2,vec![-3,0,7,-4]);
+        let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
+        let b = Matrix::<i32>::new_from_vec(2,&vec![-3,0,7,-4]);
         a.add_matrix(&b);
         a.view();
         assert_eq!(2 + 2, 4);
@@ -205,8 +221,8 @@ mod matrix_tests {
 
     #[test]
     fn sub() {
-        let mut a = Matrix::<i32>::new_from_vec(2,vec![2,6,4,8]);
-        let b = Matrix::<i32>::new_from_vec(2,vec![3,-5,-7,9]);
+        let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,6,4,8]);
+        let b = Matrix::<i32>::new_from_vec(2,&vec![3,-5,-7,9]);
         a.sub_matrix(&b);
         println!("{:?}", a);
         assert_eq!(2 + 2, 4);
@@ -214,7 +230,7 @@ mod matrix_tests {
 
     #[test]
     fn into_vector() {
-        let a = Matrix::<i32>::new_from_vec(2,vec![2,6,4,8]);
+        let a = Matrix::<i32>::new_from_vec(2,&vec![2,6,4,8]);
         a.view();
         let vector = a.into_vector();
         vector.view();
@@ -232,7 +248,7 @@ mod matrix_tests {
     #[test]
     fn transpose() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
         let transpose = mat.transpose();
         transpose.view();
@@ -241,7 +257,7 @@ mod matrix_tests {
 
     #[test]
     fn is_equal_to() {
-        let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![2,-1,-7,4,8,12,14,15,16]);
         //let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
         let transpose = mat.transpose();
@@ -253,7 +269,7 @@ mod matrix_tests {
     #[test]
     fn is_symmetric() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         let sym = mat.is_symmetric();
         println!("is_symetric: {:?}", sym);
         assert_eq!(2 + 2, 4);
@@ -262,7 +278,7 @@ mod matrix_tests {
     #[test]
     fn mul_by_scalar() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
         let mul_by_scalar = mat.mul_by_scalar(2);
         mul_by_scalar.view();
@@ -272,7 +288,7 @@ mod matrix_tests {
     #[test]
     fn get_col() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
         let get_col = mat.get_col(0);
         get_col.view();
@@ -282,19 +298,45 @@ mod matrix_tests {
     #[test]
     fn get_row() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
         let get_col = mat.get_row(1);
         get_col.view();
         assert_eq!(2 + 2, 4);
     }
     #[test]
-    fn product_by_matrix() {
-        let mat1 = Matrix::<i32>::new_from_vec(3,vec![1,3,-2,0,-1,4]);
-        let mat2 = Matrix::<i32>::new_from_vec(2,vec![2,-2,1,5,-3,4]);
-        if let Some(mut_mat) = mat1.product_by_matrix(&mat2) {
+    fn dot_product() {
+        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let mat2 = Matrix::<i32>::new_from_vec(2,&vec![2,-2,1,5,-3,4]);
+        mat1.view();
+        mat2.view();
+        if let Some(mut_mat) = mat1.dot_product(&mat2) {
             mut_mat.view();
         }
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn add_col() {
+        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let vec1 = vec![4,6];
+
+        mat1.view();
+        mat1.add_col(&vec1);
+        mat1.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn add_row() {
+        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let vec1 = vec![4,6,10];
+
+        mat1.view();
+        mat1.add_row(&vec1);
+        mat1.view();
+        
         assert_eq!(2 + 2, 4);
     }
     

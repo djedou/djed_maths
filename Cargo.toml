@@ -8,12 +8,3 @@ edition = "2018"
 
 [dependencies]
 num = "0.3.1"
-
-[package.metadata.docs.rs]
-rustdoc-args = [
-    "--html-in-header",
-    "./src/katex.html",
-]
-
-[build]
-rustdocflags = [ "--html-in-header", "./src/katex.html" ]

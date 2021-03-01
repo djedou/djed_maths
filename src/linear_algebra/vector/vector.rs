@@ -1,7 +1,7 @@
 use std::ops::{Add, Sub, Mul};
 use num::{One, Zero, cast, NumCast};
 use std::fmt::Debug;
-use crate::linear_algebra::Matrix;
+use crate::linear_algebra::matrix::Matrix;
 
 
 /// A Vector here is seen as a row matrix or row vector, so size of 1 x n.
@@ -14,12 +14,12 @@ pub struct Vector<T> {
 
 impl<T: Debug + Clone + Default> Vector<T> {
     /// new Vector from Vec
-    pub fn new_from_vec(value: Vec<T>) -> Vector<T> {
+    pub fn new_from_vec(value: &[T]) -> Vector<T> {
 
         Vector {
             rows: 1,
             cols: value.len(),
-            data: value
+            data: value.to_vec()
         }
     }
 
@@ -36,7 +36,7 @@ impl<T: Debug + Clone + Default> Vector<T> {
     /// cast a Vector into a Matrix
     pub fn into_matrix(&self, cols: usize) -> Matrix<T> {
         let data = self.data.clone();
-        Matrix::new_from_vec(cols, data)
+        Matrix::new_from_vec(cols, &data)
     }
 
     /// cast a Matrix into Vector
@@ -47,7 +47,7 @@ impl<T: Debug + Clone + Default> Vector<T> {
             vector.extend_from_slice(v.as_slice())
         });
         
-        Vector::new_from_vec(vector)
+        Vector::new_from_vec(&vector)
 
     }
 }
@@ -107,7 +107,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
     }
 
     /// add a vector to other vector
-    pub fn add_vector(&self, rhs: Vector<T>) -> Vector<T> {
+    pub fn add_vector(&self, rhs: &Vector<T>) -> Vector<T> {
         let data: Vec<T> = self.data.iter().zip(rhs.data.iter()).map(|(a,b)| (*a) + (*b)).collect();
 
         Vector {
@@ -117,8 +117,8 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
         }
     }
 
-    /// subtruct a vector from other vector
-    pub fn sub_vector(&self, rhs: Vector<T>) -> Vector<T> {
+    /// subtract a vector from other vector
+    pub fn sub_vector(&self, rhs: &Vector<T>) -> Vector<T> {
         let data: Vec<T> = self.data.iter().zip(rhs.data.iter()).map(|(a,b)| (*a) - (*b)).collect();
 
         Vector {
@@ -127,6 +127,14 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
             data: data
         }
     }
+
+    /// a . b = T. The result is a scalar
+    pub fn dot_product(&self, rhs: &Vector<T>) -> T {
+        let sum = self.get_data().iter().zip(rhs.get_data().iter()).fold(T::default(), |acc,(a,b)| acc + ((*a) * (*b)));
+        sum
+    }
+
+    //pub fn cross_product()
 }
 /*
 impl<T: Debug + Clone + Copy + One + Zero + Add<T, Output = T>> Matrix<T> {
@@ -153,16 +161,16 @@ impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
 #[cfg(test)]
 mod vector_tests {
     use super::Vector;
-    use crate::linear_algebra::Matrix;
+    use crate::linear_algebra::matrix::Matrix;
     #[test]
     fn new() {
-        let a = Vector::<i32>::new_from_vec(vec![2,-1,-7,4]);
+        let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
         a.view();
         assert_eq!(2 + 2, 4);
     }
     #[test]
     fn into_matrix() {
-        let a = Vector::<i32>::new_from_vec(vec![2,-1,-7,4]);
+        let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
         a.view();
         let mat = a.into_matrix(2);
         mat.view();
@@ -171,7 +179,7 @@ mod vector_tests {
 
     #[test]
     fn from_matrix() {
-        let mat = Matrix::<i32>::new_from_vec(2,vec![2,-1,-7,4]);
+        let mat = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
         mat.view();
         let vector = Vector::from_matrix(mat);
         vector.view();
@@ -180,7 +188,7 @@ mod vector_tests {
 
     #[test]
     fn norm() {
-        let a = Vector::<i32>::new_from_vec(vec![2,-1,-7,4]);
+        let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
         a.view();
         let norm = a.norm();
         println!("norm: {}", norm);
@@ -189,7 +197,7 @@ mod vector_tests {
 
     #[test]
     fn mul_by_scalar() {
-        let a = Vector::<i32>::new_from_vec(vec![2,-1,-7,4]);
+        let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
         a.view();
         let vector2 = a.mul_by_scalar(2);
         vector2.view();
@@ -198,7 +206,7 @@ mod vector_tests {
 
     #[test]
     fn add_scalar() {
-        let a = Vector::<i32>::new_from_vec(vec![2,-1,-7,4]);
+        let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
         a.view();
         let vector = a.add_scalar(2);
         vector.view();
@@ -207,7 +215,7 @@ mod vector_tests {
 
     #[test]
     fn get_unit_vector() {
-        let a = Vector::<f64>::new_from_vec(vec![2.0,-1.0,-7.0,4.0]);
+        let a = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
         a.view();
         let unit_vector = a.get_unit_vector();
         unit_vector.view();
@@ -215,23 +223,35 @@ mod vector_tests {
     }
     #[test]
     fn add_vector() {
-        let a = Vector::<f64>::new_from_vec(vec![2.0,-1.0,-7.0,4.0]);
-        let b = Vector::<f64>::new_from_vec(vec![2.0,-1.0,-7.0,4.0]);
+        let a = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
+        let b = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
         a.view();
         b.view();
-        let vector = a.add_vector(b);
+        let vector = a.add_vector(&b);
         vector.view();
         assert_eq!(2 + 2, 4);
     }
 
     #[test]
     fn sub_vector() {
-        let a = Vector::<f64>::new_from_vec(vec![2.0,-1.0,-7.0,4.0]);
-        let b = Vector::<f64>::new_from_vec(vec![2.0,-1.0,-7.0,4.0]);
+        let a = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
+        let b = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
         a.view();
         b.view();
-        let vector = a.sub_vector(b);
+        let vector = a.sub_vector(&b);
         vector.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    
+    #[test]
+    fn dot_product() {
+        let a = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
+        let b = Vector::<f64>::new_from_vec(&vec![2.0,-1.0,-7.0,4.0]);
+        a.view();
+        b.view();
+        let dot_product = a.dot_product(&b);
+        println!("dot_product: {:?}", dot_product);
         assert_eq!(2 + 2, 4);
     }
 /*

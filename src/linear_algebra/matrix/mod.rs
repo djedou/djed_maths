@@ -1,4 +1,5 @@
 pub(crate) mod utils;
-pub mod matrix;
+mod matrix;
 
 use utils::*;
+pub use matrix::*;

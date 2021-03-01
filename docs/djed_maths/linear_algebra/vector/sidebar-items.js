@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Vector","A Vector here is seen as a row matrix or row vector, so size of 1 x n."]],"type":[["Vector2D","It has all functions and methods of Vector"],["Vector3D","It has all functions and methods of Vector"],["Vector4D","It has all functions and methods of Vector"]]});
