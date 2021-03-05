@@ -4,6 +4,7 @@ use num::{One, Zero, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::vector::Vector;
 use std::cmp::PartialEq;
+use  std::ops::Fn;
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -37,6 +38,21 @@ impl<T: Debug + Clone + Default> Matrix<T> {
             cols,
             data
         }
+    }
+
+    /// new Matrix fill with a function
+    pub fn new_from_fn<F>(rows: usize, cols: usize, f: F) -> Matrix<T> 
+        where F: Fn(usize, usize) -> T 
+    {
+        let mut new_matrix: Matrix<T> = Matrix::new_with_zeros(rows, cols);
+
+        for x in (0..rows).into_iter(){
+            for y in (0..cols).into_iter() {
+                new_matrix.data[x][y] = f(x,y);
+            }
+        }
+        
+        new_matrix
     }
 
     /// print Matrix into console
@@ -306,8 +322,8 @@ mod matrix_tests {
     }
     #[test]
     fn dot_product() {
-        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
-        let mat2 = Matrix::<i32>::new_from_vec(2,&vec![2,-2,1,5,-3,4]);
+        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1, 3, -2, 0, -1, 4]);
+        let mat2 = Matrix::<i32>::new_from_vec(2,&vec![2, -2, 1, 5, -3, 4]);
         mat1.view();
         mat2.view();
         if let Some(mut_mat) = mat1.dot_product(&mat2) {
@@ -335,6 +351,13 @@ mod matrix_tests {
 
         mat1.view();
         mat1.add_row(&vec1);
+        mat1.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
+    #[test]
+    fn new_from_fn() {
+        let mat1 = Matrix::<i32>::new_from_fn(3,4,|_a,_b| 5);
         mat1.view();
         
         assert_eq!(2 + 2, 4);

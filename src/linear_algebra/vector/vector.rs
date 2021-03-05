@@ -23,6 +23,32 @@ impl<T: Debug + Clone + Default> Vector<T> {
         }
     }
 
+        /// new Vector fill with zeros or default T type
+        pub fn new_with_zeros(cols: usize) -> Vector<T> {
+
+            let mut data: Vec<T> = Vec::new();
+            (0..cols).into_iter().for_each(|_| data.push(T::default()));
+    
+            Vector {
+                rows: 1,
+                cols: data.len(),
+                data: data.to_vec()
+            }
+        }
+    
+        /// new Vector fill with a function
+        pub fn new_from_fn<F>(cols: usize, f: F) -> Vector<T> 
+            where F: Fn(usize) -> T 
+        {
+            let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
+    
+            for x in (0..cols).into_iter(){
+                new_vector.data[x] = f(x);
+            }
+            
+            new_vector
+        }
+
     pub fn get_data(&self) -> Vec<T> {
         self.data.clone()
     }
