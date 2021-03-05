@@ -66,6 +66,16 @@ impl<T: Debug + Clone + Default> Matrix<T> {
         println!(" ]");
     }
 
+    /// Get the numbers of rows, the size
+    pub fn nrows(&self) -> usize {
+        self.rows
+    }
+
+    /// Get the numbers of cols, the size
+    pub fn ncols(&self) -> usize {
+        self.cols
+    }
+    
     /// get Matrix data
     pub fn get_data(&self) -> Vec<Vec<T>> {
         self.data.clone()
