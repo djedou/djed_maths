@@ -4,7 +4,7 @@ use num::{One, Zero, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::vector::Vector;
 use std::cmp::PartialEq;
-use  std::ops::Fn;
+use  std::ops::FnMut;
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -41,8 +41,8 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     }
 
     /// new Matrix fill with a function
-    pub fn new_from_fn<F>(rows: usize, cols: usize, f: F) -> Matrix<T> 
-        where F: Fn(usize, usize) -> T 
+    pub fn new_from_fn<F>(rows: usize, cols: usize, f: &mut F) -> Matrix<T> 
+        where F: FnMut(usize, usize) -> T 
     {
         let mut new_matrix: Matrix<T> = Matrix::new_with_zeros(rows, cols);
 
@@ -75,7 +75,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     pub fn ncols(&self) -> usize {
         self.cols
     }
-    
+
     /// get Matrix data
     pub fn get_data(&self) -> Vec<Vec<T>> {
         self.data.clone()
@@ -367,7 +367,7 @@ mod matrix_tests {
     }
     #[test]
     fn new_from_fn() {
-        let mat1 = Matrix::<i32>::new_from_fn(3,4,|_a,_b| 5);
+        let mat1 = Matrix::<i32>::new_from_fn(3,4,&mut |_a,_b| 5);
         mat1.view();
         
         assert_eq!(2 + 2, 4);

@@ -2,6 +2,7 @@ use std::ops::{Add, Sub, Mul};
 use num::{One, Zero, cast, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::matrix::Matrix;
+use std::ops::FnMut;
 
 
 /// A Vector here is seen as a row matrix or row vector, so size of 1 x n.
@@ -37,8 +38,8 @@ impl<T: Debug + Clone + Default> Vector<T> {
     }
 
     /// new Vector fill with a function
-    pub fn new_from_fn<F>(cols: usize, f: F) -> Vector<T> 
-        where F: Fn(usize) -> T 
+    pub fn new_from_fn<F>(cols: usize, f: &mut F) -> Vector<T> 
+        where F: FnMut(usize) -> T 
     {
         let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
 
@@ -63,7 +64,7 @@ impl<T: Debug + Clone + Default> Vector<T> {
     pub fn ncols(&self) -> usize {
         self.cols
     }
-    
+
     /// print the Vector into console
     pub fn view(&self) {
         println!("rows: {}", self.rows);
