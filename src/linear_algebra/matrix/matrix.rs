@@ -188,10 +188,9 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
     /// add a new column to the matrix, only possible when self.rows == col.len()
     pub fn add_col(&mut self, col: &Vec<T>) {
-        let mut cols = self.ncols();
+        let cols = self.ncols() + 1;
         if self.rows == col.len() {
             for k in (0..col.len()).into_iter() {
-                cols = cols + 1;
                 self.data[k].push(col[k]);
             }
         }
@@ -200,9 +199,8 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
     }
 
     pub fn add_row(&mut self, row: &Vec<T>) {
-        let mut rows = self.nrows();
+        let rows = self.nrows() + 1;
         if self.cols == row.len() {
-            rows = rows + 1;
             self.data.push(row.to_vec());
         }
 
