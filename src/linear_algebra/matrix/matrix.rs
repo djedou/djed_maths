@@ -97,7 +97,6 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     pub fn is_square(&self) -> bool {
         self.rows == self.cols
     }
-
     
 }
 
@@ -226,6 +225,18 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         }
     }
 
+    /// new Matrix from Vectors, the matrix will grow by columns
+    pub fn new_from_columns(data: &Vec<Vector<T>>) -> Matrix<T> {
+        let first = &data[0];
+
+        let mut new_matrix = Matrix::new_from_vec(1, &first.get_data());
+        for i in (1..data.len()).into_iter() {
+            new_matrix.add_col(&data[i].get_data());
+        }
+
+        new_matrix
+    }
+
 
 
 }
@@ -235,6 +246,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 #[cfg(test)]
 mod matrix_tests {
     use super::Matrix;
+    use crate::linear_algebra::vector::Vector;
     #[test]
     fn new() {
         let a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
@@ -378,5 +390,18 @@ mod matrix_tests {
         
         assert_eq!(2 + 2, 4);
     }
+
     
+    #[test]
+    fn new_from_columns() {
+        //Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
+        let v1 = Vector::<f64>::new_from_vec(&vec![0.6753966962600456, 0.07920298215765209, 0.8979780697802067, 0.6198964030881386, 0.11884100014676291, 0.6208360148717391, 0.08050817587074632]); 
+        let v2 = Vector::<f64>::new_from_vec(&vec![0.536278939372817, 0.6441195751565744, 0.0329024062382276, 0.4146769744444053, 0.24430115630826355, 0.1162468754910504, 0.6356912661071378]); 
+        let v3 = Vector::<f64>::new_from_vec(&vec![0.7827283306758599, 0.0786543317452244, 0.08630282113337406, 0.033621176506813844, 0.5354701294235551, 0.4880328779263531, 0.7459103712585138]);
+        let all = vec![v1, v2, v3];
+        let new_mat = Matrix::<f64>::new_from_columns(&all);
+        new_mat.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
 }
