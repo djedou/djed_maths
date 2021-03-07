@@ -237,7 +237,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         new_matrix
     }
 
-    /// apply the function to each element of the matrix
+    /// apply a function to each element of the matrix
     pub fn apply<F>(&mut self, f: F)
         where F: Fn(usize, usize, T) -> T
     {
@@ -250,7 +250,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         }
     }
 
-    /// apply the function to each element of the matrix
+    /// apply a mut function to each element of the matrix
     pub fn apply_mut<F>(&mut self, f: &mut F)
         where F: FnMut(usize, usize, T) -> T
     {
@@ -261,6 +261,24 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
                 self.data[x][y] = f(x, y, value);
             }
         }
+    }
+
+    /// apply a mut function to each element of the matrix
+    pub fn zip_apply<F>(&self, rhs: &Matrix<T>, f: F) -> Result<Matrix<T>, String>
+        where F: Fn(T, T) -> T
+    {
+        if self.nrows() == rhs.nrows() && self.ncols() == rhs.ncols() {
+            let cols = self.ncols();
+            let self_vector = self.into_vector();
+            let rhs_vector = rhs.into_vector();
+            let data: Vec<T> = self_vector.get_data().iter().zip(rhs_vector.get_data().iter()).map(|(a,b)| f(*a,*b)).collect();
+            let apply_mat = Matrix::new_from_vec(cols, &data);
+            Ok(apply_mat)
+        }
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
+        
     }
 
 
@@ -440,6 +458,21 @@ mod matrix_tests {
         mat1.apply(|_x,_y,v| v + 1);
         mat1.view();
         
+        assert_eq!(2 + 2, 4);
+    }
+
+    
+
+    #[test]
+    fn zip_apply() {
+        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let mut mat2 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+
+        mat1.view();
+        mat2.view();
+        let mat3 = mat1.zip_apply(&mat2, |a,b| a + b).unwrap();
+        mat3.view();
+
         assert_eq!(2 + 2, 4);
     }
 }
