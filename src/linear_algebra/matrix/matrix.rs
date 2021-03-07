@@ -4,7 +4,7 @@ use num::{One, Zero, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::vector::Vector;
 use std::cmp::PartialEq;
-use  std::ops::FnMut;
+use  std::ops::{FnMut, Fn};
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -41,7 +41,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     }
 
     /// new Matrix fill with a function
-    pub fn new_from_fn<F>(rows: usize, cols: usize, f: &mut F) -> Matrix<T> 
+    pub fn new_from_fn_mut<F>(rows: usize, cols: usize, f: &mut F) -> Matrix<T> 
         where F: FnMut(usize, usize) -> T 
     {
         let mut new_matrix: Matrix<T> = Matrix::new_with_zeros(rows, cols);
@@ -237,6 +237,32 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         new_matrix
     }
 
+    /// apply the function to each element of the matrix
+    pub fn apply<F>(&mut self, f: F)
+        where F: Fn(usize, usize, T) -> T
+    {
+
+        for x in (0..self.nrows()).into_iter(){
+            for y in (0..self.ncols()).into_iter() {
+                let value = self.data[x][y];
+                self.data[x][y] = f(x, y, value);
+            }
+        }
+    }
+
+    /// apply the function to each element of the matrix
+    pub fn apply_mut<F>(&mut self, f: &mut F)
+        where F: FnMut(usize, usize, T) -> T
+    {
+
+        for x in (0..self.nrows()).into_iter(){
+            for y in (0..self.ncols()).into_iter() {
+                let value = self.data[x][y];
+                self.data[x][y] = f(x, y, value);
+            }
+        }
+    }
+
 
 
 }
@@ -383,9 +409,10 @@ mod matrix_tests {
         
         assert_eq!(2 + 2, 4);
     }
+
     #[test]
     fn new_from_fn() {
-        let mat1 = Matrix::<i32>::new_from_fn(3,4,&mut |_a,_b| 5);
+        let mat1 = Matrix::<i32>::new_from_fn_mut(3,4,&mut |_a,_b| 5);
         mat1.view();
         
         assert_eq!(2 + 2, 4);
@@ -401,6 +428,17 @@ mod matrix_tests {
         let all = vec![v1, v2, v3];
         let new_mat = Matrix::<f64>::new_from_columns(&all);
         new_mat.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn apply() {
+        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+
+        mat1.view();
+        mat1.apply(|_x,_y,v| v + 1);
+        mat1.view();
         
         assert_eq!(2 + 2, 4);
     }
