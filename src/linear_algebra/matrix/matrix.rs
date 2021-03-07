@@ -207,7 +207,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
     }
     
     /// dot product two matrix
-    pub fn dot_product(&self, rhs: &Matrix<T>) -> Option<Matrix<T>> {
+    pub fn dot_product(&self, rhs: &Matrix<T>) -> Result<Matrix<T>, String> {
         if self.cols == rhs.rows {
             let mut data: Vec<T> = Vec::new();
             for a in (0..self.rows).into_iter() {
@@ -218,10 +218,10 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
                     data.push(sum);
                 }
             }
-            Some(Matrix::new_from_vec(rhs.cols, &data))
+            Ok(Matrix::new_from_vec(rhs.cols, &data))
         }
         else {
-            None
+            Err("self cols should equal to rhs rows".to_owned())
         }
     }
 
@@ -354,7 +354,7 @@ mod matrix_tests {
         let mat2 = Matrix::<i32>::new_from_vec(2,&vec![2, -2, 1, 5, -3, 4]);
         mat1.view();
         mat2.view();
-        if let Some(mut_mat) = mat1.dot_product(&mat2) {
+        if let Ok(mut_mat) = mat1.dot_product(&mat2) {
             mut_mat.view();
         }
         assert_eq!(2 + 2, 4);
