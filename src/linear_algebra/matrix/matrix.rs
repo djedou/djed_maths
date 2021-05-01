@@ -2,7 +2,7 @@ use std::ops::{Add, Sub};
 use super::matrix_internal_op_mut;
 use num::{One, Zero, NumCast};
 use std::fmt::Debug;
-use crate::linear_algebra::vector::{Vector, CallBack};
+use crate::linear_algebra::vector::{Vector, CallBack, ZipCallBack};
 use std::cmp::PartialEq;
 use  std::ops::{FnMut, Fn};
 use rayon::prelude::*;
@@ -44,7 +44,7 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
     }
 
     /// new Matrix fill with a function
-    pub fn new_from_fn(rows: usize, cols: usize, f: CallBack<T>) -> Matrix<T> {
+    pub fn new_from_fn(rows: usize, cols: usize, f: CallBack<T, usize>) -> Matrix<T> {
         let new_vector = Vector::new_from_fn(rows * cols, f);                                                
         new_vector.into_matrix(cols)
     }
@@ -225,16 +225,12 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
     }
 
     /// apply a function to each element of the matrix
-    pub fn apply<F>(&mut self, f: F)
-        where F: Fn(usize, usize, T) -> T
-    {
+    pub fn apply(&self, f: CallBack<T, T>) -> Matrix<T> {
 
-        for x in (0..self.nrows()).into_iter(){
-            for y in (0..self.ncols()).into_iter() {
-                let value = self.data[x][y];
-                self.data[x][y] = f(x, y, value);
-            }
-        }
+        let new_matrix = self.into_vector()
+                        .apply(f)
+                        .into_matrix(self.ncols());
+        new_matrix
     }
 
     /// apply a mut function to each element of the matrix
@@ -250,21 +246,13 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         }
     }
 
-    /// apply a mut function to each element of the matrix
-    pub fn zip_apply<F>(&self, rhs: &Matrix<T>, f: F) -> Result<Matrix<T>, String>
-        where F: Fn(T, T) -> T
-    {
-        if self.nrows() == rhs.nrows() && self.ncols() == rhs.ncols() {
-            let cols = self.ncols();
-            let self_vector = self.into_vector();
-            let rhs_vector = rhs.into_vector();
-            let data: Vec<T> = self_vector.get_data().iter().zip(rhs_vector.get_data().iter()).map(|(a,b)| f(*a,*b)).collect();
-            let apply_mat = Matrix::new_from_vec(cols, &data);
-            Ok(apply_mat)
-        }
-        else {
-            Err("self and rhs should have same size".to_owned())
-        }
+    /// zip apply a mut function to each element of the matrix
+    pub fn zip_apply(&self, rhs: &Matrix<T>, f: ZipCallBack<T,T>) -> Result<Matrix<T>, String> {
+        
+        let matrix = self.into_vector()
+                            .zip_apply(&rhs.into_vector(), f)?
+                            .into_matrix(self.ncols());
+        Ok(matrix)
         
     }
 
@@ -278,7 +266,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 mod matrix_tests {
     use super::Matrix;
     use std::sync::{Arc, Mutex};
-    //use crate::linear_algebra::vector::{Vector, CallBack};
+    use crate::linear_algebra::vector::{Vector, CallBack, ZipCallBack};
     #[test]
     fn new_from_vec() {
         let a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
@@ -303,14 +291,14 @@ mod matrix_tests {
 
     #[test]
     fn new_from_fn() {
-        let callback = Arc::new(Mutex::new(|x| (x as i32) * 3));
+        let callback: CallBack<i32, usize> = Arc::new(Mutex::new(|x| (x as i32) * 3));
         let mat1 = Matrix::<i32>::new_from_fn(4,4,callback);
         mat1.view();
         
         assert_eq!(2 + 2, 4);
     }
 
-    /*#[test]
+    #[test]
     fn add() {
         let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
         let b = Matrix::<i32>::new_from_vec(2,&vec![-3,0,7,-4]);
@@ -443,27 +431,28 @@ mod matrix_tests {
 
     #[test]
     fn apply() {
-        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
-
+        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let callback: CallBack<i32, i32> = Arc::new(Mutex::new(|x| (x as i32) * 3));
         mat1.view();
-        mat1.apply(|_x,_y,v| v + 1);
-        mat1.view();
+        let mat2 = mat1.apply(callback);
+        mat2.view();
         
         assert_eq!(2 + 2, 4);
     }
 
-    
 
     #[test]
     fn zip_apply() {
-        let mut mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
-        let mut mat2 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
+        let mat2 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
 
         mat1.view();
         mat2.view();
-        let mat3 = mat1.zip_apply(&mat2, |a,b| a + b).unwrap();
+        
+        let callback: ZipCallBack<i32, i32> = Arc::new(Mutex::new(|a,b| a + b));
+        let mat3: Matrix<i32> = mat1.zip_apply(&mat2, callback).unwrap();
         mat3.view();
 
         assert_eq!(2 + 2, 4);
-    }*/
+    }
 }

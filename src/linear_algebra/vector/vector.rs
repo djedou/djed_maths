@@ -10,7 +10,8 @@ use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 
 
-pub type CallBack<T> = Arc<Mutex<dyn FnMut(usize) -> T + Send + Sync>>;
+pub type CallBack<T,P> = Arc<Mutex<dyn FnMut(P) -> T + Send + Sync>>;
+pub type ZipCallBack<T,P> = Arc<Mutex<dyn FnMut(P,P) -> T + Send + Sync>>;
 
 /// A Vector here is seen as a row matrix or row vector, so size of 1 x n.
 #[derive(Debug, Clone)]
@@ -44,7 +45,7 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
     }
 
     /// new Vector fill with a function
-    pub fn new_from_fn(cols: usize, f: CallBack<T>) -> Vector<T> {
+    pub fn new_from_fn(cols: usize, f: CallBack<T,usize>) -> Vector<T> {
         let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
 
         let data: Vec<T> = (0..cols).into_par_iter()
@@ -57,6 +58,45 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
         new_vector.data = data;
 
         new_vector
+    }
+
+    pub fn apply(&self, f: CallBack<T, T>) -> Vector<T> {
+        let data = self.get_data().into_par_iter()
+                                .clone()
+                                .map(|x| {
+                                    let mut cb = f.lock().unwrap();
+                                    cb(x)
+                                })
+                                .collect();
+        
+        Vector {
+            rows: self.nrows(),
+            cols: self.ncols(),
+            data
+        }
+    }
+
+    pub fn zip_apply(&self, second: &Vector<T>, f: ZipCallBack<T, T>) -> Result<Vector<T>, String> {
+        if self.nrows() == second.nrows() && self.ncols() == second.ncols() {
+            let data = self.get_data().into_par_iter()
+                                .clone()
+                                .zip(second.get_data())
+                                .map(|(a,b)| {
+                                    let mut cb = f.lock().unwrap();
+                                    cb(a,b)
+                                })
+                                .collect();
+        
+            Ok(Vector {
+                rows: self.nrows(),
+                cols: self.ncols(),
+                data
+            })
+        }
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
+        
     }
 
     /// Get Data of the Vector
@@ -255,6 +295,30 @@ mod vector_tests {
         assert_eq!(2 + 2, 4);
     }
     
+    #[test]
+    fn apply() {
+        let callback = Arc::new(Mutex::new(|x| x * 3));
+        let a = Vector::new_from_fn(10, callback);
+        a.view();
+        let callback2 = Arc::new(Mutex::new(|x| x * 5));
+        let b = a.apply(callback2);
+        b.view();
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn zip_apply() {
+        let callback = Arc::new(Mutex::new(|x| x * 3));
+        let a = Vector::new_from_fn(10, callback);
+        a.view();
+        let callback2 = Arc::new(Mutex::new(|x| x * 5));
+        let b = a.apply(callback2);
+        b.view();
+        let zipcallback = Arc::new(Mutex::new(|a,b| a + b));
+        let c = a.zip_apply(&b, zipcallback).unwrap();
+        c.view();
+        assert_eq!(2 + 2, 4);
+    }
     #[test]
     fn into_matrix() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
