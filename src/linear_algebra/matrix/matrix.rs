@@ -1,12 +1,15 @@
 use std::ops::{Add, Sub};
-//use super::matrix_internal_op_mut;
+use super::matrix_internal_op_mut;
 use num::{One, Zero, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::vector::{Vector, CallBack};
 use std::cmp::PartialEq;
 use  std::ops::{FnMut, Fn};
 use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    iter::Sum,
+};
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -83,8 +86,8 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
     }
     
 }
-/*
-impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T>> Matrix<T> {
+
+impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T> + Sum<T> + Sync + Send> Matrix<T> {
     /// add two matrix, the result is in the first matrix
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
@@ -93,7 +96,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
             });
         });
     }
-
+/* */
     /// subtruct two matrix, the result is in the first matrix
     pub fn sub_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
@@ -268,7 +271,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
 
 }
-*/
+
 
 
 #[cfg(test)]
