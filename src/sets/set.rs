@@ -156,7 +156,7 @@ impl<T: PartialOrd + PartialEq + Debug + Clone + Copy> Set<T> {
 
 }
 
-
+/*
 
 #[cfg(test)]
 mod set_trait_tests {
@@ -242,3 +242,4 @@ mod set_trait_tests {
 
     }
 }
+*/

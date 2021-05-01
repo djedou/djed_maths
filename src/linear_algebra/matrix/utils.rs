@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-pub(crate) fn matrix_internal_op_mut<F, T: Clone>(u: &mut [T], v: &[T], mut f: F)
+pub fn matrix_internal_op_mut<F, T: Clone>(u: &mut [T], v: &[T], mut f: F)
 where F: FnMut(&mut T, &T) 
 {
     let len = min(u.len(), v.len());

@@ -4,7 +4,7 @@ use super::vector::Vector;
 /// It has all functions and methods of Vector<T>
 pub type Vector4D<T> = Vector<T>;
 
-
+/*
 impl<T: Debug + Clone + Default> Vector4D<T> {
     /// new Vector4D
     pub fn new_vec4d(value: &[T; 4]) -> Vector4D<T> {
@@ -26,3 +26,4 @@ mod vector4d_tests {
         assert_eq!(2 + 2, 4);
     }
 }
+*/

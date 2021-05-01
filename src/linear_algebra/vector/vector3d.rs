@@ -3,7 +3,7 @@ use super::vector::Vector;
 
 /// It has all functions and methods of Vector<T>
 pub type Vector3D<T> = Vector<T>;
-
+/*
 
 impl<T: Debug + Clone + Default> Vector3D<T> {
     /// new Vector3D
@@ -26,3 +26,4 @@ mod vector3d_tests {
         assert_eq!(2 + 2, 4);
     }
 }
+*/

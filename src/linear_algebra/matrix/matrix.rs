@@ -1,10 +1,12 @@
 use std::ops::{Add, Sub};
-use super::matrix_internal_op_mut;
+//use super::matrix_internal_op_mut;
 use num::{One, Zero, NumCast};
 use std::fmt::Debug;
-use crate::linear_algebra::vector::Vector;
+use crate::linear_algebra::vector::{Vector, CallBack};
 use std::cmp::PartialEq;
 use  std::ops::{FnMut, Fn};
+use rayon::prelude::*;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
@@ -13,11 +15,11 @@ pub struct Matrix<T> {
     data: Vec<Vec<T>>,
 }
 
-impl<T: Debug + Clone + Default> Matrix<T> {
+impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
     /// new Matrix from Vec
-    pub fn new_from_vec(cols: usize, value: &Vec<T>) -> Matrix<T> {
-        let data_slices: Vec<&[T]> = value.chunks(cols).collect();
-        let data: Vec<Vec<T>> = data_slices.into_iter().map(|d| d.to_vec()).collect();
+    pub fn new_from_vec(cols: usize, value: &[T]) -> Matrix<T> {
+        let data_slices: Vec<&[T]> = value.par_chunks(cols).collect();
+        let data: Vec<Vec<T>> = data_slices.into_par_iter().map(|d| d.to_vec()).collect();
 
         Matrix {
             rows: data.len(),
@@ -29,9 +31,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     /// new Matrix fill with zeros or default T type
     pub fn new_with_zeros(rows: usize, cols: usize) -> Matrix<T> {
         let zeros = vec![T::default(); cols];
-
-        let mut data: Vec<Vec<T>> = Vec::new();
-        (0..rows).into_iter().for_each(|_| data.push(zeros.clone()));
+        let data: Vec<Vec<T>> = (0..rows).into_par_iter().map(|_| zeros.clone()).collect();
 
         Matrix {
             rows,
@@ -41,18 +41,9 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     }
 
     /// new Matrix fill with a function
-    pub fn new_from_fn_mut<F>(rows: usize, cols: usize, f: &mut F) -> Matrix<T> 
-        where F: FnMut(usize, usize) -> T 
-    {
-        let mut new_matrix: Matrix<T> = Matrix::new_with_zeros(rows, cols);
-
-        for x in (0..rows).into_iter(){
-            for y in (0..cols).into_iter() {
-                new_matrix.data[x][y] = f(x,y);
-            }
-        }
-        
-        new_matrix
+    pub fn new_from_fn(rows: usize, cols: usize, f: CallBack<T>) -> Matrix<T> {
+        let new_vector = Vector::new_from_fn(rows * cols, f);                                                
+        new_vector.into_matrix(cols)
     }
 
     /// print Matrix into console
@@ -83,14 +74,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
 
     /// cast a Matrix into Vector (row vector)
     pub fn into_vector(&self) -> Vector<T> {
-
-        let mut vector: Vec<T> = Vec::new();
-        self.get_data().iter().for_each(|v| {
-            vector.extend_from_slice(v.as_slice())
-        });
-        
-        Vector::new_from_vec(&vector)
-
+        Vector::from_matrix(self.clone())
     }
 
     /// Check if the matrix is a square matrix n x m where n == m.
@@ -99,7 +83,7 @@ impl<T: Debug + Clone + Default> Matrix<T> {
     }
     
 }
-
+/*
 impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T>> Matrix<T> {
     /// add two matrix, the result is in the first matrix
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
@@ -284,21 +268,46 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
 
 }
-
+*/
 
 
 #[cfg(test)]
 mod matrix_tests {
     use super::Matrix;
-    use crate::linear_algebra::vector::Vector;
+    use std::sync::{Arc, Mutex};
+    //use crate::linear_algebra::vector::{Vector, CallBack};
     #[test]
-    fn new() {
+    fn new_from_vec() {
         let a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
-        println!("{:?}", a);
+        a.view();
+        assert_eq!(2 + 2, 4);
+    }
+    
+    #[test]
+    fn new_with_zeros() {
+        let a = Matrix::<i32>::new_with_zeros(20,10);
+        a.view();
+        assert_eq!(2 + 2, 4);
+    }
+    #[test]
+    fn into_vector() {
+        let a = Matrix::<i32>::new_with_zeros(4,4);
+        a.view();
+        let vector = a.into_vector();
+        vector.view();
         assert_eq!(2 + 2, 4);
     }
 
     #[test]
+    fn new_from_fn() {
+        let callback = Arc::new(Mutex::new(|x| (x as i32) * 3));
+        let mat1 = Matrix::<i32>::new_from_fn(4,4,callback);
+        mat1.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
+
+    /*#[test]
     fn add() {
         let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
         let b = Matrix::<i32>::new_from_vec(2,&vec![-3,0,7,-4]);
@@ -316,22 +325,8 @@ mod matrix_tests {
         assert_eq!(2 + 2, 4);
     }
 
-    #[test]
-    fn into_vector() {
-        let a = Matrix::<i32>::new_from_vec(2,&vec![2,6,4,8]);
-        a.view();
-        let vector = a.into_vector();
-        vector.view();
-        assert_eq!(2 + 2, 4);
-    }
     
 
-    #[test]
-    fn new_with_zeros() {
-        let a = Matrix::<i32>::new_with_zeros(4,4);
-        a.view();
-        assert_eq!(2 + 2, 4);
-    }
 
     #[test]
     fn transpose() {
@@ -428,13 +423,6 @@ mod matrix_tests {
         assert_eq!(2 + 2, 4);
     }
 
-    #[test]
-    fn new_from_fn() {
-        let mat1 = Matrix::<i32>::new_from_fn_mut(3,4,&mut |_a,_b| 5);
-        mat1.view();
-        
-        assert_eq!(2 + 2, 4);
-    }
 
     
     #[test]
@@ -474,5 +462,5 @@ mod matrix_tests {
         mat3.view();
 
         assert_eq!(2 + 2, 4);
-    }
+    }*/
 }
