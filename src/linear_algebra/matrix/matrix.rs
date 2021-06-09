@@ -380,8 +380,8 @@ mod matrix_tests {
     }
     #[test]
     fn dot_product() {
-        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1, 3, -2, 0, -1, 4]);
-        let mat2 = Matrix::<i32>::new_from_vec(2,&vec![2, -2, 1, 5, -3, 4]);
+        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1, 2, 3, 4, 5, 6]);
+        let mat2 = Matrix::<i32>::new_from_vec(2,&vec![7, 8, 9, 10, 11, 12]);
         mat1.view();
         mat2.view();
         if let Ok(mut_mat) = mat1.dot_product(&mat2) {
