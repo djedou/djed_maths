@@ -318,19 +318,19 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
             Err("self cols should equal to rhs rows".to_owned())
         }
     }
-/*
+
     /// new Matrix from Vectors, the matrix will grow by columns
     pub fn new_from_columns(data: &Vec<Vector<T>>) -> Matrix<T> {
         let first = &data[0];
 
         let mut new_matrix = Matrix::new_from_vec(1, &first.get_data());
         for i in (1..data.len()).into_iter() {
-            new_matrix.add_col(&data[i].get_data());
+            new_matrix.add_col(&data[i].get_data()).unwrap();
         }
 
         new_matrix
     }
-*/
+
     /// apply a function to each element of the matrix
     pub fn apply(&self, f: CallBack<T, T>) -> Matrix<T> {
 
@@ -552,7 +552,6 @@ mod matrix_tests {
     }
 
 
-/*  
     #[test]
     fn new_from_columns() {
         //Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
@@ -565,7 +564,7 @@ mod matrix_tests {
         
         assert_eq!(2 + 2, 4);
     }
-*/
+
     #[test]
     fn apply() {
         let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
