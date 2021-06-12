@@ -22,6 +22,18 @@ pub struct Vector<T> {
 }
 
 impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
+
+    /// new Empty Vector 
+    pub fn new() -> Vector<T> {
+        let data: Vec<T> = Vec::new();
+
+        Vector {
+            rows: 0,
+            cols: 0,
+            data
+        }
+    }
+
     /// new Vector from Vec
     pub fn new_from_vec(value: &[T]) -> Vector<T> {
 
@@ -31,7 +43,7 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
             data: value.to_vec()
         }
     }
-
+    
     /// new Vector fill with zeros or default T type
     pub fn new_with_zeros(cols: usize) -> Vector<T> {
 
@@ -123,8 +135,7 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
 
     /// cast a Vector into a Matrix
     pub fn into_matrix(&self, cols: usize) -> Matrix<T> {
-        let data = self.data.clone();
-        Matrix::new_from_vec(cols, &data)
+        Matrix::new_from_vec(cols, &self.data)
     }
 
     /// cast a Matrix into Vector
@@ -132,13 +143,14 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
 
         let vector = Arc::new(Mutex::new(Vec::new()));
         matrix.get_data().par_iter().for_each(|v| {
-            vector.lock().unwrap().extend_from_slice(v.as_slice())
+            vector.lock().unwrap().extend_from_slice(v.get_data().as_slice())
         });
         
         let res = vector.lock().unwrap().clone();
         Vector::new_from_vec(&res)
 
     }
+    
 }
 
 
@@ -150,8 +162,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
                     fold(|| T::default(), |acc, d| acc + ((*d) * (*d)))
                     .sum::<T>();
 
-        let cast_sum: f64 = cast(sum).unwrap();
-        cast_sum.sqrt()
+        cast::<T, f64>(sum).unwrap().sqrt()
     }
 
     /// check if norm = 1.0
@@ -232,6 +243,11 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
         }
     }
 
+    pub fn push_scalar(&mut self, scalar: T) {
+        self.data.push(scalar);
+        self.cols = self.cols + 1;
+    }
+
     /// a . b = T. The result is a scalar
     pub fn dot_product(&self, rhs: &Vector<T>) -> T {
         let sum: T = self.get_data()
@@ -242,8 +258,6 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
                         .sum::<T>();
         sum
     }
-
-    //pub fn cross_product()
 }
 /*
 
@@ -268,6 +282,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
 }
 */
 
+
 #[cfg(test)]
 mod vector_tests {
     use super::{Vector};
@@ -282,7 +297,7 @@ mod vector_tests {
 
     #[test]
     fn new_with_zeros() {
-        let a = Vector::<i32>::new_with_zeros(100);
+        let a = Vector::<f64>::new_with_zeros(100);
         a.view();
         assert_eq!(2 + 2, 4);
     }
@@ -319,6 +334,7 @@ mod vector_tests {
         c.view();
         assert_eq!(2 + 2, 4);
     }
+  /*
     #[test]
     fn into_matrix() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
@@ -336,7 +352,7 @@ mod vector_tests {
         vector.view();
         assert_eq!(2 + 2, 4);
     }
-
+*/
     #[test]
     fn norm() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-2,3,-4]);
@@ -404,6 +420,15 @@ mod vector_tests {
         println!("dot_product: {:?}", dot_product);
         assert_eq!(2 + 2, 4);
     }
+
+    #[test]
+    fn push_scalar() {
+        let mut a = Vector::<i32>::new_from_vec(&vec![1,2,3]);
+        a.view();
+        a.push_scalar(5);
+        a.view();
+        assert_eq!(2 + 2, 4);
+    }
 /*
     #[test]
     fn add() {
@@ -421,5 +446,7 @@ mod vector_tests {
         a.substract_matrix(&b);
         println!("{:?}", a);
         assert_eq!(2 + 2, 4);
-    }*/
+    }
+
+    */
 }

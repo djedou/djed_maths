@@ -11,18 +11,35 @@ use std::{
     iter::Sum,
 };
 
+/// rows = number of Vectors  
+/// cols = nmber of value in each Vector or the cols of one Vector in the Matrix  
+/// data = Vec<Vector<T>>
 #[derive(Debug, Clone)]
 pub struct Matrix<T> {
-    rows: usize,
-    cols: usize,
-    data: Vec<Vec<T>>,
+    rows: usize, 
+    cols: usize, 
+    data: Vec<Vector<T>>,
 }
 
 impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
+
+    pub fn new() -> Matrix<T> {
+        let data: Vec<Vector<T>> = vec![Vector::new()];
+
+        Matrix {
+            rows: 0,
+            cols: 0,
+            data
+        }
+    }
     /// new Matrix from Vec
     pub fn new_from_vec(cols: usize, value: &[T]) -> Matrix<T> {
-        let data_slices: Vec<&[T]> = value.par_chunks(cols).collect();
-        let data: Vec<Vec<T>> = data_slices.into_par_iter().map(|d| d.to_vec()).collect();
+
+        let data: Vec<Vector<T>> = value
+                    .par_chunks(cols).collect::<Vec<&[T]>>()
+                    .into_par_iter()
+                    .map(|d| Vector::new_from_vec(d))
+                    .collect();
 
         Matrix {
             rows: data.len(),
@@ -33,11 +50,15 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
 
     /// new Matrix fill with zeros or default T type
     pub fn new_with_zeros(rows: usize, cols: usize) -> Matrix<T> {
-        let zeros = vec![T::default(); cols];
-        let data: Vec<Vec<T>> = (0..rows).into_par_iter().map(|_| zeros.clone()).collect();
+
+        let data: Vec<Vector<T>> = vec![T::default(); cols * rows]
+                    .par_chunks(cols).collect::<Vec<&[T]>>()
+                    .into_par_iter()
+                    .map(|d| Vector::new_from_vec(d))
+                    .collect();
 
         Matrix {
-            rows,
+            rows: data.len(),
             cols,
             data
         }
@@ -55,7 +76,7 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
         println!("cols: {}", self.cols);
         println!("data: [");
         for d in self.data.iter() {
-            println!("   {:?},", d);
+            println!("   {:?},", d.get_data());
         }
         println!(" ]");
     }
@@ -71,7 +92,7 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
     }
 
     /// get Matrix data
-    pub fn get_data(&self) -> Vec<Vec<T>> {
+    pub fn get_data(&self) -> Vec<Vector<T>> {
         self.data.clone()
     }
 
@@ -88,36 +109,94 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
 }
 
 impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T> + Sum<T> + Sync + Send> Matrix<T> {
-    /// add two matrix, the result is in the first matrix
-    pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
-        matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
-            matrix_internal_op_mut(&mut x, &y, |x,&y| {
-                *x = *x + y
-            });
-        });
-    }
-/* */
-    /// subtruct two matrix, the result is in the first matrix
-    pub fn sub_matrix(&mut self, rhs: &Matrix<T>) {
-        matrix_internal_op_mut(&mut self.data, &rhs.data, |mut x,y| {
-            matrix_internal_op_mut(&mut x, &y, |x,&y| {
-                *x = *x - y
-            });
-        });
-    }
-
-    /// Transpose a Matrix
-    pub fn transpose(&self) -> Matrix<T> {
-        let mut transpose_matrix: Matrix<T> = Matrix::new_with_zeros(self.cols,self.rows);
-
-        for a in (0..self.rows).into_iter() {
-            for b in (0..self.cols).into_iter() {
-                transpose_matrix.data[b][a] = self.data[a][b];
-            }
+    /// add two matrix and return a new one
+    pub fn add_matrix(&mut self, rhs: &Matrix<T>) -> Result<Matrix<T>, String> {
+        
+        if self.ncols() == rhs.ncols() && self.nrows() == rhs.nrows() {
+            let data: Vec<Vector<T>> = self.data
+                            .par_iter()
+                            .zip(
+                                rhs.data
+                                            .par_iter()
+                            )
+                            .map(|(a, b)| a.add_vector(b)).collect();
+    
+            Ok(Matrix {
+                rows: data.len(),
+                cols: self.ncols(),
+                data
+            })
         }
-
-        transpose_matrix
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
     }
+
+    /// add two matrix, the result is in the first matrix
+    pub fn add_matrix_to_self(&mut self, rhs: &Matrix<T>) -> Result<(), String> {
+        
+        if self.ncols() == rhs.ncols() && self.nrows() == rhs.nrows()  {
+            let data: Vec<Vector<T>> = self.data
+                            .par_iter()
+                            .zip(
+                                rhs.data
+                                            .par_iter()
+                            )
+                            .map(|(a, b)| a.add_vector(b)).collect();
+            
+            self.data = data;
+
+            Ok(())
+        }
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
+    }
+ 
+    /// subtruct two matrix and return a new one
+    pub fn sub_matrix(&mut self, rhs: &Matrix<T>) -> Result<Matrix<T>, String> {
+
+        if self.ncols() == rhs.ncols() && self.nrows() == rhs.nrows() {
+            let data: Vec<Vector<T>> = self.data
+                            .par_iter()
+                            .zip(
+                                rhs.data
+                                            .par_iter()
+                            )
+                            .map(|(a, b)| a.sub_vector(b)).collect();
+    
+            Ok(Matrix {
+                rows: data.len(),
+                cols: self.ncols(),
+                data
+            })
+        }
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
+    }
+
+    /// subtruct two matrix, the result is in the first matrix
+    pub fn sub_matrix_from_self(&mut self, rhs: &Matrix<T>) -> Result<(), String> {
+        
+        if self.ncols() == rhs.ncols() && self.nrows() == rhs.nrows() {
+            let data: Vec<Vector<T>> = self.data
+                            .par_iter()
+                            .zip(
+                                rhs.data
+                                            .par_iter()
+                            )
+                            .map(|(a, b)| a.sub_vector(b)).collect();
+    
+            
+            self.data = data;
+            Ok(())
+        }
+        else {
+            Err("self and rhs should have same size".to_owned())
+        }
+    }
+
 
     /// Compare two matrix, if they are equal
     pub fn is_equal_to(&self, rhs: &Matrix<T>) -> bool {
@@ -149,19 +228,17 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
     /// multiply by a scalar
     pub fn mul_by_scalar(&self, scalar: T) -> Matrix<T> {
-        let vector = self.into_vector();
-        let vector = vector.mul_by_scalar(scalar);
-
-        vector.into_matrix(self.cols)
+        self.into_vector()
+        .mul_by_scalar(scalar)
+        .into_matrix(self.cols)
     }
 
     /// Get column by index
     pub fn get_col(&self, n: usize) -> Vector<T> {
-        let mut data: Vec<T> = Vec::new();
-        for a in self.data.iter() {
-            data.push(a[n]);
-        };
-
+        let data: Vec<T> = self.data
+                            .par_iter()
+                            .map(|a| a.get_data()[n]).collect();
+    
         Vector::new_from_vec(&data)
     }
 
@@ -169,30 +246,59 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
     pub fn get_row(&self, n: usize) -> Vector<T> {
         let data = &self.data[n];
 
-        Vector::new_from_vec(&data)
+        Vector::new_from_vec(&data.get_data())
     }
 
     /// add a new column to the matrix, only possible when self.rows == col.len()
-    pub fn add_col(&mut self, col: &Vec<T>) {
-        let cols = self.ncols() + 1;
+    pub fn add_col(&mut self, col: &[T]) -> Result<(), String> {
+
         if self.rows == col.len() {
+            let cols = self.ncols() + 1;
+            
             for k in (0..col.len()).into_iter() {
-                self.data[k].push(col[k]);
+                self.data[k].push_scalar(col[k]);
             }
-        }
-
-        self.cols = cols;
-    }
-
-    pub fn add_row(&mut self, row: &Vec<T>) {
-        let rows = self.nrows() + 1;
-        if self.cols == row.len() {
-            self.data.push(row.to_vec());
-        }
-
-        self.rows = rows;
-    }
     
+            self.cols = cols;
+
+            Ok(())
+
+        }
+        else {
+            Err("self rows and col len should have same size".to_owned())
+        }
+    }
+
+    pub fn add_row(&mut self, row: &[T]) -> Result<(), String> {
+        if self.cols == row.len() {
+            let rows = self.rows + 1;
+
+            self.data.push(Vector::new_from_vec(row));
+            self.rows = rows;
+
+            Ok(())
+        }
+        else {
+            Err("self rows and col len should have same size".to_owned())
+        }
+    }
+
+    /// Transpose a Matrix
+    pub fn transpose(&self) -> Matrix<T> {
+        let mut transpose_matrix: Matrix<T> = Matrix::new();
+
+        transpose_matrix.cols = self.rows;
+
+        for c in (0..self.cols).into_iter() {
+            transpose_matrix.add_row(&self.get_col(c).get_data()).unwrap();
+        }
+
+        let _ = transpose_matrix.data.remove(0);
+        transpose_matrix.rows = transpose_matrix.data.len();
+
+        transpose_matrix
+    }
+
     /// dot product two matrix
     pub fn dot_product(&self, rhs: &Matrix<T>) -> Result<Matrix<T>, String> {
         if self.cols == rhs.rows {
@@ -205,13 +311,14 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
                     data.push(sum);
                 }
             }
+
             Ok(Matrix::new_from_vec(rhs.cols, &data))
         }
         else {
             Err("self cols should equal to rhs rows".to_owned())
         }
     }
-
+/*
     /// new Matrix from Vectors, the matrix will grow by columns
     pub fn new_from_columns(data: &Vec<Vector<T>>) -> Matrix<T> {
         let first = &data[0];
@@ -223,16 +330,21 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
         new_matrix
     }
-
+*/
     /// apply a function to each element of the matrix
     pub fn apply(&self, f: CallBack<T, T>) -> Matrix<T> {
 
-        let new_matrix = self.into_vector()
-                        .apply(f)
-                        .into_matrix(self.ncols());
-        new_matrix
+        let data: Vec<Vector<T>> = self.data
+                                        .par_iter()
+                                        .map(|a| a.apply(f.clone()))
+                                        .collect();
+        Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data
+        }
     }
-
+/*
     /// apply a mut function to each element of the matrix
     pub fn apply_mut<F>(&mut self, f: &mut F)
         where F: FnMut(usize, usize, T) -> T
@@ -245,28 +357,43 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
             }
         }
     }
-
+*/
     /// zip apply a mut function to each element of the matrix
     pub fn zip_apply(&self, rhs: &Matrix<T>, f: ZipCallBack<T,T>) -> Result<Matrix<T>, String> {
         
-        let matrix = self.into_vector()
-                            .zip_apply(&rhs.into_vector(), f)?
-                            .into_matrix(self.ncols());
-        Ok(matrix)
+        //let matrix = self.into_vector()
+        //                    .zip_apply(&rhs.into_vector(), f)?
+        //                    .into_matrix(self.ncols());
+
+        let data: Vec<Vector<T>> = self.data
+                            .par_iter()
+                            .zip(
+                                rhs.data
+                                            .par_iter()
+                            )
+                            .map(|(a, b)| a.zip_apply(&b, f.clone()).unwrap()).collect();
+        Ok(Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            data
+        })
         
     }
-
-
-
 }
-
-
 
 #[cfg(test)]
 mod matrix_tests {
     use super::Matrix;
     use std::sync::{Arc, Mutex};
     use crate::linear_algebra::vector::{Vector, CallBack, ZipCallBack};
+
+    #[test]
+    fn new_matrix() {
+        let a = Matrix::<i32>::new();
+        a.view();
+        assert_eq!(2 + 2, 4);
+    }
+
     #[test]
     fn new_from_vec() {
         let a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
@@ -276,10 +403,11 @@ mod matrix_tests {
     
     #[test]
     fn new_with_zeros() {
-        let a = Matrix::<i32>::new_with_zeros(20,10);
+        let a = Matrix::<f64>::new_with_zeros(20,10);
         a.view();
         assert_eq!(2 + 2, 4);
     }
+
     #[test]
     fn into_vector() {
         let a = Matrix::<i32>::new_with_zeros(4,4);
@@ -299,14 +427,15 @@ mod matrix_tests {
     }
 
     #[test]
-    fn add() {
-        let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,-1,-7,4]);
-        let b = Matrix::<i32>::new_from_vec(2,&vec![-3,0,7,-4]);
-        a.add_matrix(&b);
-        a.view();
+    fn add_matrix() {
+        let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,5,-1,3]);
+        let b = Matrix::<i32>::new_from_vec(2,&vec![1,4,3,7]);
+        if let Ok(c)  = a.add_matrix(&b) {
+            c.view();
+        }
         assert_eq!(2 + 2, 4);
     }
-
+/*
     #[test]
     fn sub() {
         let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,6,4,8]);
@@ -315,14 +444,13 @@ mod matrix_tests {
         println!("{:?}", a);
         assert_eq!(2 + 2, 4);
     }
-
-    
-
+*/
 
     #[test]
     fn transpose() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
-        let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
+        //let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0,2,5,7]);
+        let mat = Matrix::<i32>::new_from_vec(3,&vec![6,4,24,1,-9,8]);
         mat.view();
         let transpose = mat.transpose();
         transpose.view();
@@ -332,14 +460,21 @@ mod matrix_tests {
     #[test]
     fn is_equal_to() {
         let mat = Matrix::<i32>::new_from_vec(3,&vec![2,-1,-7,4,8,12,14,15,16]);
-        //let mat = Matrix::<i32>::new_from_vec(3,vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat2 = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
+        let mat3 = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
-        let transpose = mat.transpose();
-        let equl = mat.is_equal_to(&transpose);
-        println!("they are equals: {:?}", equl);
+        mat2.view();
+        mat3.view();
+
+        let equl1 = mat.is_equal_to(&mat2);
+        println!("mat is equal to mat2 ? : {:?}", equl1);
+
+        let equl2 = mat2.is_equal_to(&mat3);
+        println!("mat2 is equal to mat3 ? : {:?}", equl2);
+
         assert_eq!(2 + 2, 4);
     }
-
+/*
     #[test]
     fn is_symmetric() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
@@ -348,7 +483,7 @@ mod matrix_tests {
         println!("is_symetric: {:?}", sym);
         assert_eq!(2 + 2, 4);
     }
-
+*/
     #[test]
     fn mul_by_scalar() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
@@ -364,7 +499,7 @@ mod matrix_tests {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
         let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
-        let get_col = mat.get_col(0);
+        let get_col = mat.get_col(1);
         get_col.view();
         assert_eq!(2 + 2, 4);
     }
@@ -374,10 +509,12 @@ mod matrix_tests {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
         let mat = Matrix::<i32>::new_from_vec(3,&vec![1,5,-3,5,4,2,-3,2,0]);
         mat.view();
-        let get_col = mat.get_row(1);
-        get_col.view();
+        let get_row = mat.get_row(2);
+        get_row.view();
         assert_eq!(2 + 2, 4);
     }
+
+
     #[test]
     fn dot_product() {
         let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1, 2, 3, 4, 5, 6]);
@@ -396,7 +533,7 @@ mod matrix_tests {
         let vec1 = vec![4,6];
 
         mat1.view();
-        mat1.add_col(&vec1);
+        mat1.add_col(&vec1).unwrap();
         mat1.view();
         
         assert_eq!(2 + 2, 4);
@@ -408,14 +545,14 @@ mod matrix_tests {
         let vec1 = vec![4,6,10];
 
         mat1.view();
-        mat1.add_row(&vec1);
+        mat1.add_row(&vec1).unwrap();
         mat1.view();
         
         assert_eq!(2 + 2, 4);
     }
 
 
-    
+/*  
     #[test]
     fn new_from_columns() {
         //Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
@@ -428,7 +565,7 @@ mod matrix_tests {
         
         assert_eq!(2 + 2, 4);
     }
-
+*/
     #[test]
     fn apply() {
         let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
@@ -455,4 +592,5 @@ mod matrix_tests {
 
         assert_eq!(2 + 2, 4);
     }
+    
 }
