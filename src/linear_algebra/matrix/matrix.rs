@@ -331,6 +331,23 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         new_matrix
     }
 
+    /// new Matrix from Vectors, the matrix will grow by columns
+    pub fn new_from_rows(data: &Vec<Vector<T>>) -> Matrix<T> {
+        let first = &data[0];
+
+        for d in data.into_iter() {
+            if first.ncols() != d.ncols() {
+                panic!("Vector should have same size")
+            }
+        }
+        
+        Matrix {
+            rows: data.len(),
+            cols: first.ncols(),
+            data: data.clone()
+        }
+    }
+
     /// apply a function to each element of the matrix
     pub fn apply(&self, f: CallBack<T, T>) -> Matrix<T> {
 
@@ -560,6 +577,19 @@ mod matrix_tests {
         let v3 = Vector::<f64>::new_from_vec(&vec![0.7827283306758599, 0.0786543317452244, 0.08630282113337406, 0.033621176506813844, 0.5354701294235551, 0.4880328779263531, 0.7459103712585138]);
         let all = vec![v1, v2, v3];
         let new_mat = Matrix::<f64>::new_from_columns(&all);
+        new_mat.view();
+        
+        assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn new_from_rows() {
+        //Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
+        let v1 = Vector::<f64>::new_from_vec(&vec![0.6753966962600456, 0.07920298215765209, 0.8979780697802067, 0.6198964030881386, 0.11884100014676291, 0.6208360148717391, 0.08050817587074632]); 
+        let v2 = Vector::<f64>::new_from_vec(&vec![0.536278939372817, 0.6441195751565744, 0.0329024062382276, 0.4146769744444053, 0.24430115630826355, 0.1162468754910504, 0.6356912661071378]); 
+        let v3 = Vector::<f64>::new_from_vec(&vec![0.7827283306758599, 0.0786543317452244, 0.08630282113337406, 0.033621176506813844, 0.5354701294235551, 0.4880328779263531, 0.7459103712585138]);
+        let all = vec![v1, v2, v3];
+        let new_mat = Matrix::<f64>::new_from_rows(&all);
         new_mat.view();
         
         assert_eq!(2 + 2, 4);
