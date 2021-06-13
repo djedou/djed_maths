@@ -66,23 +66,30 @@ impl<T: Debug + Clone + Default + Send + Sync + NumCast > Vector<T> {
     pub fn new_from_fn<F>(cols: usize, f: F) -> Vector<T>
         where F: FnOnce(T) -> T + Clone + Send + Sync
     {
-        let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
+        //let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
 
-        let data: Vec<T> = Parallel::new()
+        /*let data: Vec<T> = Parallel::new()
                             .each(0..cols, |i| f(cast::<usize, T>(i).unwrap()))
-                            .run();
+                            .run();*/
+        let data: Vec<T> = (0..cols).map(|x| f.clone()(cast::<usize, T>(x).unwrap())).collect();
+        //new_vector.data = data;
 
-        new_vector.data = data;
-
-        new_vector
+        Vector {
+            rows: 1,
+            cols: data.len(),
+            data
+        }
     }
 
     pub fn apply<F>(&self, f: F) -> Vector<T>
-        where F: FnOnce(T) -> T + Clone + Send + Sync
+        where F: FnOnce(T) -> T + Copy + Clone + Send + Sync
     {
-        let data: Vec<T> = Parallel::new()
+        /*let data: Vec<T> = Parallel::new()
                 .each(self.get_data().into_iter(), f)
-                .run();
+                .run();*/
+        let data: Vec<T> = self.get_data().into_iter()
+                            .map(|v| f(v))
+                            .collect();
         
         Vector {
             rows: self.nrows(),
@@ -92,19 +99,18 @@ impl<T: Debug + Clone + Default + Send + Sync + NumCast > Vector<T> {
     }
 
     pub fn zip_apply<F>(&self, second: &Vector<T>, f: F) -> Result<Vector<T>, String>
-        where F: FnOnce(T,T) -> T + Clone + Send + Sync
+        where F: FnOnce(T,T) -> T + Copy + Clone + Send + Sync
     {
         if self.nrows() == second.nrows() && self.ncols() == second.ncols() {
 
-            let data_vec: Vec<(T,T)> = self.get_data().into_par_iter()
-                                .clone()
+            let data_vec: Vec<(T,T)> = self.get_data().into_iter()
                                 .zip(second.get_data())
                                 .map(|(a,b)| (a,b))
                                 .collect();
                                 
-            let data: Vec<T> = Parallel::new()
-                                .each(data_vec.into_iter(), |(a,b)| f(a,b))
-                                .run();
+            let data: Vec<T> = data_vec.into_iter()
+                            .map(|(a,b)| f(a,b))
+                            .collect();
         
             Ok(Vector {
                 rows: self.nrows(),

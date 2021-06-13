@@ -10,7 +10,7 @@ use std::{
     //sync::{Arc, Mutex},
     iter::Sum,
 };
-//use easy_parallel::Parallel;
+use easy_parallel::Parallel;
 
 /// rows = number of Vectors  
 /// cols = nmber of value in each Vector or the cols of one Vector in the Matrix  
@@ -69,8 +69,18 @@ impl<T: Debug + NumCast + Clone + Default + Sync + Send> Matrix<T> {
     pub fn new_from_fn<F>(rows: usize, cols: usize, f: F) -> Matrix<T>
         where F: FnOnce(T) -> T + Clone + Send + Sync
     {
-        let new_vector = Vector::new_from_fn(rows * cols, f);                                                
-        new_vector.into_matrix(cols)
+        //let new_vector = Vector::new_from_fn(rows * cols, f);                                                
+        //new_vector.into_matrix(cols)
+
+        let data = Parallel::new()
+                            .each(0..rows, |_r| Vector::new_from_fn(cols, f))
+                            .run();
+
+        Matrix {
+            rows: rows,
+            cols: cols,
+            data
+        }
     }
 
     /// print Matrix into console
@@ -354,12 +364,12 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
     /// apply a function to each element of the matrix
     pub fn apply<F>(&self, f: F) -> Matrix<T>
-        where F: FnOnce(T) -> T + Clone + Send + Sync
+        where F: FnOnce(T) -> T + Copy + Clone + Send + Sync
     {
 
         let data: Vec<Vector<T>> = self.data
                                         .par_iter()
-                                        .map(|a| a.apply(f.clone()))
+                                        .map(|a| a.apply(f))
                                         .collect();
 
         Matrix {
@@ -372,7 +382,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
 
     /// zip apply a mut function to each element of the matrix
     pub fn zip_apply<F>(&self, rhs: &Matrix<T>, f: F) -> Result<Matrix<T>, String>
-        where F: FnOnce(T, T) -> T + Clone + Send + Sync
+        where F: FnOnce(T, T) -> T + Copy + Clone + Send + Sync
     {
 
         let data: Vec<Vector<T>> = self.data
@@ -381,7 +391,7 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
                                 rhs.data
                                             .par_iter()
                             )
-                            .map(|(a, b)| a.zip_apply(&b, f.clone()).unwrap()).collect();
+                            .map(|(a, b)| a.zip_apply(&b, f).unwrap()).collect();
         Ok(Matrix {
             rows: self.rows,
             cols: self.cols,
@@ -431,7 +441,8 @@ mod matrix_tests {
     #[test]
     fn new_from_fn() {
         let callback = |x| x * 3;
-        let mat1 = Matrix::<i32>::new_from_fn(20,1130,callback);
+        let mat1 = Matrix::<i32>::new_from_fn(22600,45201,callback);
+        //let mat1 = Matrix::<i32>::new_from_fn(22,45,callback);
         mat1.view();
         
         assert_eq!(2 + 2, 4);
