@@ -1,15 +1,16 @@
 use std::ops::{Add, Sub};
-use super::matrix_internal_op_mut;
+//use super::matrix_internal_op_mut;
 use num::{One, Zero, NumCast};
 use std::fmt::Debug;
-use crate::linear_algebra::vector::{Vector, CallBack, ZipCallBack};
+use crate::linear_algebra::vector::{Vector, /*CallBack, ZipCallBack*/};
 use std::cmp::PartialEq;
-use  std::ops::{FnMut, Fn};
+//use  std::ops::{FnMut, Fn};
 use rayon::prelude::*;
 use std::{
-    sync::{Arc, Mutex},
+    //sync::{Arc, Mutex},
     iter::Sum,
 };
+//use easy_parallel::Parallel;
 
 /// rows = number of Vectors  
 /// cols = nmber of value in each Vector or the cols of one Vector in the Matrix  
@@ -21,7 +22,7 @@ pub struct Matrix<T> {
     data: Vec<Vector<T>>,
 }
 
-impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
+impl<T: Debug + NumCast + Clone + Default + Sync + Send> Matrix<T> {
 
     pub fn new() -> Matrix<T> {
         let data: Vec<Vector<T>> = vec![Vector::new()];
@@ -65,7 +66,9 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
     }
 
     /// new Matrix fill with a function
-    pub fn new_from_fn(rows: usize, cols: usize, f: CallBack<T, usize>) -> Matrix<T> {
+    pub fn new_from_fn<F>(rows: usize, cols: usize, f: F) -> Matrix<T>
+        where F: FnOnce(T) -> T + Clone + Send + Sync
+    {
         let new_vector = Vector::new_from_fn(rows * cols, f);                                                
         new_vector.into_matrix(cols)
     }
@@ -109,6 +112,7 @@ impl<T: Debug + Clone + Default + Sync + Send> Matrix<T> {
 }
 
 impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<T, Output = T> + Sub<T, Output = T> + Sum<T> + Sync + Send> Matrix<T> {
+    
     /// add two matrix and return a new one
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) -> Result<Matrix<T>, String> {
         
@@ -349,38 +353,27 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
     }
 
     /// apply a function to each element of the matrix
-    pub fn apply(&self, f: CallBack<T, T>) -> Matrix<T> {
+    pub fn apply<F>(&self, f: F) -> Matrix<T>
+        where F: FnOnce(T) -> T + Clone + Send + Sync
+    {
 
         let data: Vec<Vector<T>> = self.data
                                         .par_iter()
                                         .map(|a| a.apply(f.clone()))
                                         .collect();
+
         Matrix {
             rows: self.rows,
             cols: self.cols,
             data
         }
     }
-/*
-    /// apply a mut function to each element of the matrix
-    pub fn apply_mut<F>(&mut self, f: &mut F)
-        where F: FnMut(usize, usize, T) -> T
-    {
 
-        for x in (0..self.nrows()).into_iter(){
-            for y in (0..self.ncols()).into_iter() {
-                let value = self.data[x][y];
-                self.data[x][y] = f(x, y, value);
-            }
-        }
-    }
-*/
+
     /// zip apply a mut function to each element of the matrix
-    pub fn zip_apply(&self, rhs: &Matrix<T>, f: ZipCallBack<T,T>) -> Result<Matrix<T>, String> {
-        
-        //let matrix = self.into_vector()
-        //                    .zip_apply(&rhs.into_vector(), f)?
-        //                    .into_matrix(self.ncols());
+    pub fn zip_apply<F>(&self, rhs: &Matrix<T>, f: F) -> Result<Matrix<T>, String>
+        where F: FnOnce(T, T) -> T + Clone + Send + Sync
+    {
 
         let data: Vec<Vector<T>> = self.data
                             .par_iter()
@@ -396,13 +389,14 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + PartialEq + Add<
         })
         
     }
+    
 }
 
 #[cfg(test)]
 mod matrix_tests {
     use super::Matrix;
-    use std::sync::{Arc, Mutex};
-    use crate::linear_algebra::vector::{Vector, CallBack, ZipCallBack};
+    //use std::sync::{Arc, Mutex};
+    use crate::linear_algebra::vector::{Vector/*, CallBack, ZipCallBack*/};
 
     #[test]
     fn new_matrix() {
@@ -436,8 +430,8 @@ mod matrix_tests {
 
     #[test]
     fn new_from_fn() {
-        let callback: CallBack<i32, usize> = Arc::new(Mutex::new(|x| (x as i32) * 3));
-        let mat1 = Matrix::<i32>::new_from_fn(4,4,callback);
+        let callback = |x| x * 3;
+        let mat1 = Matrix::<i32>::new_from_fn(20,1130,callback);
         mat1.view();
         
         assert_eq!(2 + 2, 4);
@@ -452,16 +446,17 @@ mod matrix_tests {
         }
         assert_eq!(2 + 2, 4);
     }
-/*
+    
+
     #[test]
     fn sub() {
         let mut a = Matrix::<i32>::new_from_vec(2,&vec![2,6,4,8]);
         let b = Matrix::<i32>::new_from_vec(2,&vec![3,-5,-7,9]);
-        a.sub_matrix(&b);
+        a.sub_matrix(&b).unwrap();
         println!("{:?}", a);
         assert_eq!(2 + 2, 4);
     }
-*/
+
 
     #[test]
     fn transpose() {
@@ -491,7 +486,8 @@ mod matrix_tests {
 
         assert_eq!(2 + 2, 4);
     }
-/*
+    
+
     #[test]
     fn is_symmetric() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
@@ -500,7 +496,8 @@ mod matrix_tests {
         println!("is_symetric: {:?}", sym);
         assert_eq!(2 + 2, 4);
     }
-*/
+
+
     #[test]
     fn mul_by_scalar() {
         //let mat = Matrix::<i32>::new_from_vec(3,vec![2,-1,-7,4,8,12,14,15,16]);
@@ -597,15 +594,16 @@ mod matrix_tests {
 
     #[test]
     fn apply() {
-        let mat1 = Matrix::<i32>::new_from_vec(3,&vec![1,3,-2,0,-1,4]);
-        let callback: CallBack<i32, i32> = Arc::new(Mutex::new(|x| (x as i32) * 3));
+        let callback = |x| x * 3;
+        let mat1 = Matrix::<i32>::new_from_fn(20,11300,callback);
         mat1.view();
+
+        let callback = |x: i32| x * 2;
         let mat2 = mat1.apply(callback);
         mat2.view();
         
         assert_eq!(2 + 2, 4);
     }
-
 
     #[test]
     fn zip_apply() {
@@ -615,7 +613,7 @@ mod matrix_tests {
         mat1.view();
         mat2.view();
         
-        let callback: ZipCallBack<i32, i32> = Arc::new(Mutex::new(|a,b| a + b));
+        let callback = |a,b| a + b;
         let mat3: Matrix<i32> = mat1.zip_apply(&mat2, callback).unwrap();
         mat3.view();
 

@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 num = "0.3.1"
 rayon = "1.5.0"
+easy-parallel = "3.1.0"

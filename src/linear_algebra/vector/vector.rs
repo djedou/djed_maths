@@ -5,13 +5,17 @@ use std::{
 use num::{One, Zero, cast, NumCast};
 use std::fmt::Debug;
 use crate::linear_algebra::matrix::{Matrix};
-use std::ops::FnMut;
+//use std::ops::FnMut;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
+use easy_parallel::Parallel;
 
 
-pub type CallBack<T,P> = Arc<Mutex<dyn FnMut(P) -> T + Send + Sync>>;
-pub type ZipCallBack<T,P> = Arc<Mutex<dyn FnMut(P,P) -> T + Send + Sync>>;
+//pub type CallBack<T,P> = Box<dyn FnOnce(P) -> T + Send + Sync>;
+//pub type ZipCallBack<T,P> = Arc<Mutex<dyn FnMut(P,P) -> T + Send + Sync>>;
+
+
+//pub type CallBack<F: FnOnce(f64) -> f64 + Clone + Send + Sync> = F;
 
 /// A Vector here is seen as a row matrix or row vector, so size of 1 x n.
 #[derive(Debug, Clone)]
@@ -21,7 +25,7 @@ pub struct Vector<T> {
     data: Vec<T>,
 }
 
-impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
+impl<T: Debug + Clone + Default + Send + Sync + NumCast > Vector<T> {
 
     /// new Empty Vector 
     pub fn new() -> Vector<T> {
@@ -47,7 +51,9 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
     /// new Vector fill with zeros or default T type
     pub fn new_with_zeros(cols: usize) -> Vector<T> {
 
-        let data: Vec<T> = (0..cols).into_par_iter().map(|_| T::default()).collect();
+        let data: Vec<T> = Parallel::new()
+                .each(0..cols, |_i| T::default())
+                .run();
 
         Vector {
             rows: 1,
@@ -57,29 +63,26 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
     }
 
     /// new Vector fill with a function
-    pub fn new_from_fn(cols: usize, f: CallBack<T,usize>) -> Vector<T> {
+    pub fn new_from_fn<F>(cols: usize, f: F) -> Vector<T>
+        where F: FnOnce(T) -> T + Clone + Send + Sync
+    {
         let mut new_vector: Vector<T> = Vector::new_with_zeros(cols);
 
-        let data: Vec<T> = (0..cols).into_par_iter()
-                            .map(|x| {
-                                let mut cb = f.lock().unwrap();
-                                cb(x)
-                            })
-                            .collect();
+        let data: Vec<T> = Parallel::new()
+                            .each(0..cols, |i| f(cast::<usize, T>(i).unwrap()))
+                            .run();
 
         new_vector.data = data;
 
         new_vector
     }
 
-    pub fn apply(&self, f: CallBack<T, T>) -> Vector<T> {
-        let data = self.get_data().into_par_iter()
-                                .clone()
-                                .map(|x| {
-                                    let mut cb = f.lock().unwrap();
-                                    cb(x)
-                                })
-                                .collect();
+    pub fn apply<F>(&self, f: F) -> Vector<T>
+        where F: FnOnce(T) -> T + Clone + Send + Sync
+    {
+        let data: Vec<T> = Parallel::new()
+                .each(self.get_data().into_iter(), f)
+                .run();
         
         Vector {
             rows: self.nrows(),
@@ -88,16 +91,20 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
         }
     }
 
-    pub fn zip_apply(&self, second: &Vector<T>, f: ZipCallBack<T, T>) -> Result<Vector<T>, String> {
+    pub fn zip_apply<F>(&self, second: &Vector<T>, f: F) -> Result<Vector<T>, String>
+        where F: FnOnce(T,T) -> T + Clone + Send + Sync
+    {
         if self.nrows() == second.nrows() && self.ncols() == second.ncols() {
-            let data = self.get_data().into_par_iter()
+
+            let data_vec: Vec<(T,T)> = self.get_data().into_par_iter()
                                 .clone()
                                 .zip(second.get_data())
-                                .map(|(a,b)| {
-                                    let mut cb = f.lock().unwrap();
-                                    cb(a,b)
-                                })
+                                .map(|(a,b)| (a,b))
                                 .collect();
+                                
+            let data: Vec<T> = Parallel::new()
+                                .each(data_vec.into_iter(), |(a,b)| f(a,b))
+                                .run();
         
             Ok(Vector {
                 rows: self.nrows(),
@@ -155,6 +162,7 @@ impl<T: Debug + Clone + Default + Send + Sync> Vector<T> {
 
 
 impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Send + Sync + Sum<T>> Vector<T> {
+    
     /// the Norm or Magnitude ||v|| of a vector
     pub fn norm(&self) -> f64 {
         let sum = self.get_data()
@@ -172,11 +180,9 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
 
     /// multiply a Vector by a scalar
     pub fn mul_by_scalar(&self, scalar: T) -> Vector<T> {
-        let data: Vec<T> = self.data
-            .par_iter()
-            .cloned()
-            .map(|a| a * scalar)
-            .collect();
+        let data: Vec<T> = Parallel::new()
+                                .each(self.data.clone().into_iter(), |a| a * scalar)
+                                .run();
     
         Vector {
             rows: 1,
@@ -188,10 +194,9 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
 
     /// add a scalar to a Vector
     pub fn add_scalar(&self, scalar: T) -> Vector<T> {
-        let data: Vec<T> = self.data
-            .par_iter()
-            .map(|a| *a + scalar)
-            .collect();
+        let data: Vec<T> = Parallel::new()
+                                .each(self.data.clone().into_iter(), |a| a + scalar)
+                                .run();
     
             Vector {
                 rows: 1,
@@ -258,9 +263,10 @@ impl<T: Debug + Clone + Copy + One + Zero + Default + NumCast + Add<T, Output = 
                         .sum::<T>();
         sum
     }
+    
 }
-/*
 
+/*
 impl<T: Debug + Clone + Copy + One + Zero + Default + Send + Sync + Add<T, Output = T>> Vector<T> {
     pub fn add_matrix(&mut self, rhs: &Matrix<T>) {
         matrix_internal_op_mut(&mut self.get_data(), &rhs.get_data(), |mut x,y| {
@@ -287,7 +293,8 @@ impl<T: Debug + Clone + Copy + One + Zero + Sub<T, Output = T>> Matrix<T> {
 mod vector_tests {
     use super::{Vector};
     use std::sync::{Arc, Mutex};
-    use crate::linear_algebra::matrix::Matrix;
+    //use crate::linear_algebra::matrix::Matrix;
+    
     #[test]
     fn new() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
@@ -297,43 +304,50 @@ mod vector_tests {
 
     #[test]
     fn new_with_zeros() {
-        let a = Vector::<f64>::new_with_zeros(100);
+        let a = Vector::<f64>::new_with_zeros(45201);
         a.view();
         assert_eq!(2 + 2, 4);
     }
 
     #[test]
-    fn new_from_fn() {
-        let callback = Arc::new(Mutex::new(|x| x * 3));
-        let a = Vector::new_from_fn(100, callback);
+    fn new_from_fn()
+    {
+        let callback = |x: i64| x * 3;
+
+        let a = Vector::new_from_fn(45201, callback);
         a.view();
         assert_eq!(2 + 2, 4);
     }
-    
+   
     #[test]
     fn apply() {
-        let callback = Arc::new(Mutex::new(|x| x * 3));
-        let a = Vector::new_from_fn(10, callback);
+        let callback = |x: i64| x * 3;
+        let a = Vector::new_from_fn(45201, callback);
         a.view();
-        let callback2 = Arc::new(Mutex::new(|x| x * 5));
+        let callback2 = |x| x * 5;
         let b = a.apply(callback2);
         b.view();
+        let c = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
+        let callback3 = |x| x * 5;
+        let d = c.apply(callback3);
+        d.view();
         assert_eq!(2 + 2, 4);
     }
 
     #[test]
     fn zip_apply() {
-        let callback = Arc::new(Mutex::new(|x| x * 3));
-        let a = Vector::new_from_fn(10, callback);
+        let callback = |x: i64| x * 3;
+        let a = Vector::new_from_fn(45201, callback);
         a.view();
-        let callback2 = Arc::new(Mutex::new(|x| x * 5));
+        let callback2 = |x| x * 5;
         let b = a.apply(callback2);
         b.view();
-        let zipcallback = Arc::new(Mutex::new(|a,b| a + b));
+        let zipcallback = |a,b| a + b;
         let c = a.zip_apply(&b, zipcallback).unwrap();
         c.view();
         assert_eq!(2 + 2, 4);
     }
+    
   /*
     #[test]
     fn into_matrix() {
@@ -353,6 +367,7 @@ mod vector_tests {
         assert_eq!(2 + 2, 4);
     }
 */
+/*
     #[test]
     fn norm() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-2,3,-4]);
@@ -361,7 +376,7 @@ mod vector_tests {
         println!("norm: {}", norm);
         assert_eq!(2 + 2, 4);
     }
-
+*/
     #[test]
     fn mul_by_scalar() {
         let a = Vector::<i32>::new_from_vec(&vec![2,-1,-7,4]);
@@ -412,8 +427,10 @@ mod vector_tests {
     
     #[test]
     fn dot_product() {
-        let a = Vector::<i32>::new_from_vec(&vec![1,2,3]);
-        let b = Vector::<i32>::new_from_vec(&vec![4,-5,6]);
+        let callback = |x: i64| x * 3;
+        let a = Vector::new_from_fn(45201, callback);
+        let callback = |x: i64| x * 2;
+        let b = Vector::new_from_fn(45201, callback);
         a.view();
         b.view();
         let dot_product = a.dot_product(&b);
@@ -429,6 +446,7 @@ mod vector_tests {
         a.view();
         assert_eq!(2 + 2, 4);
     }
+    
 /*
     #[test]
     fn add() {
